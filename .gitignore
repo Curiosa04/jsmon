@@ -132,3 +132,4 @@ dmypy.json
 # jsmon
 downloads/*
 targets/*
+hashes.json

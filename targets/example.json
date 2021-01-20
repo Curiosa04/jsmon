@@ -2,6 +2,7 @@
     {
         "slackChannelId": "",
         "telegramChatId": "",
+        "mask":"",
         "endpoints": [
             "https://example.com/main.js"
         ]
@@ -9,10 +10,9 @@
     {
         "slackChannelId": "",
         "telegramChatId": "",
+        "mask":"",
         "endpoints": [
             "https://foo.com/bar.js"
         ]
     }
 ]
-
-
