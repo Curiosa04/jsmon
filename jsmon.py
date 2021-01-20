@@ -79,24 +79,24 @@ def get_hash(string):
 def save_endpoint(endpoint, ephash, eptext):
     # save endpoint content to file
     # add it to  list of
-    with open(os.environ['jsMonDir'] + "/hashes.json", "r") as jsm:
+    with open("{}/hashes.json".format(os.environ['jsMonDir']), "r") as jsm:
         jsmd = json.load(jsm)
         if endpoint in jsmd.keys():
             jsmd[endpoint].append(ephash)
         else:
             jsmd[endpoint] = [ephash]
 
-    with open(os.environ['jsMonDir'] + "/hashes.json", "w") as jsm:
+    with open("{}/hashes.json".format(os.environ['jsMonDir']), "w") as jsm:
         json.dump(jsmd, jsm)
 
-    with open(os.environ['jsMonDir'] + "/downloads/{}".format(ephash), "w") as epw:
+    with open("{}/downloads/{}".format(os.environ['jsMonDir'], ephash), "w") as epw:
         epw.write(eptext)
 
 
 def get_previous_endpoint_hash(endpoint):
     # get previous endpoint version
     # or None if doesnt exist
-    with open(os.environ['jsMonDir'] + "/hashes.json", "r") as jsm:
+    with open("{}/hashes.json".format(os.environ['jsMonDir']), "r") as jsm:
         jsmd = json.load(jsm)
         if endpoint in jsmd.keys():
             return jsmd[endpoint][-1]
@@ -105,7 +105,7 @@ def get_previous_endpoint_hash(endpoint):
 
 
 def get_file_stats(fhash):
-    return os.stat(os.environ['jsMonDir'] + "/downloads/{}".format(fhash))
+    return os.stat("{}/downloads/{}".format(os.environ['jsMonDir'], fhash))
 
 
 def get_diff(old, new):
@@ -113,8 +113,8 @@ def get_diff(old, new):
         "indent_with_tabs": 1,
         "keep_function_indentation": 0,
     }
-    oldlines = open(os.environ['jsMonDir'] + "/downloads/{}".format(old), "r").readlines()
-    newlines = open(os.environ['jsMonDir'] + "/downloads/{}".format(new), "r").readlines()
+    oldlines = open("{}/downloads/{}".format(os.environ['jsMonDir'], old), "r").readlines()
+    newlines = open("{}/downloads/{}".format(os.environ['jsMonDir'], new), "r").readlines()
     oldbeautified = jsbeautifier.beautify("".join(oldlines), opt).splitlines()
     newbeautified = jsbeautifier.beautify("".join(newlines), opt).splitlines()
     # print(oldbeautified)
