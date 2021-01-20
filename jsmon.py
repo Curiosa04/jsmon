@@ -45,7 +45,7 @@ def get_target_data(endpointdir):
     filenames = list(filter(lambda x: x != "example.json", filenames))
     for file in filenames:
         with open("{}/{}".format(endpointdir, file), "r") as f:
-            data = json.load(f)
+            data.append(json.load(f))
 
     for item in data:
         if NOTIFY_SLACK and item['slackChannelId'] == "":
@@ -79,24 +79,24 @@ def get_hash(string):
 def save_endpoint(endpoint, ephash, eptext):
     # save endpoint content to file
     # add it to  list of
-    with open("hashes.json", "r") as jsm:
+    with open(os.environ['jsMonDir'] + "/hashes.json", "r") as jsm:
         jsmd = json.load(jsm)
         if endpoint in jsmd.keys():
             jsmd[endpoint].append(ephash)
         else:
             jsmd[endpoint] = [ephash]
 
-    with open("hashes.json", "w") as jsm:
+    with open(os.environ['jsMonDir'] + "/hashes.json", "w") as jsm:
         json.dump(jsmd, jsm)
 
-    with open("downloads/{}".format(ephash), "w") as epw:
+    with open(os.environ['jsMonDir'] + "/downloads/{}".format(ephash), "w") as epw:
         epw.write(eptext)
 
 
 def get_previous_endpoint_hash(endpoint):
     # get previous endpoint version
     # or None if doesnt exist
-    with open("hashes.json", "r") as jsm:
+    with open(os.environ['jsMonDir'] + "/hashes.json", "r") as jsm:
         jsmd = json.load(jsm)
         if endpoint in jsmd.keys():
             return jsmd[endpoint][-1]
@@ -105,7 +105,7 @@ def get_previous_endpoint_hash(endpoint):
 
 
 def get_file_stats(fhash):
-    return os.stat("downloads/{}".format(fhash))
+    return os.stat(os.environ['jsMonDir'] + "/downloads/{}".format(fhash))
 
 
 def get_diff(old, new):
@@ -113,8 +113,8 @@ def get_diff(old, new):
         "indent_with_tabs": 1,
         "keep_function_indentation": 0,
     }
-    oldlines = open("downloads/{}".format(old), "r").readlines()
-    newlines = open("downloads/{}".format(new), "r").readlines()
+    oldlines = open(os.environ['jsMonDir'] + "/downloads/{}".format(old), "r").readlines()
+    newlines = open(os.environ['jsMonDir'] + "/downloads/{}".format(new), "r").readlines()
     oldbeautified = jsbeautifier.beautify("".join(oldlines), opt).splitlines()
     newbeautified = jsbeautifier.beautify("".join(newlines), opt).splitlines()
     # print(oldbeautified)
@@ -190,7 +190,7 @@ def main():
     if NOTIFY_TELEGRAM and "CHANGEME" in [TELEGRAM_TOKEN]:
         print("Please Set Up your Telegram Token And Chat ID!!!")
 
-    allTargets = get_target_data('targets')
+    allTargets = get_target_data(os.environ['jsMonDir'] + "/targets")
 
     for target in allTargets:
         for fullEndpoint in target['endpoints']:
@@ -203,7 +203,7 @@ def main():
             ep_text = get_endpoint(fullEndpoint)
             if ep_text == None:
                 continue
-            
+
             ep_hash = get_hash(ep_text)
             if ep_hash == prev_hash:
                 print("No file change detected")
