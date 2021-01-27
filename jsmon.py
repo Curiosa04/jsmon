@@ -14,6 +14,13 @@ TELEGRAM_TOKEN = config("JSMON_TELEGRAM_TOKEN", default="CHANGEME")
 SLACK_TOKEN = config("JSMON_SLACK_TOKEN", default="CHANGEME")
 NOTIFY_SLACK = config("JSMON_NOTIFY_SLACK", default=False, cast=bool)
 NOTIFY_TELEGRAM = config("JSMON_NOTIFY_TELEGRAM", default=False, cast=bool)
+JS_MON_DIR = os.environ['jsMonDir']
+JS_MON_DATA = os.environ['jsMonDataDir']
+
+# uncomment for testing
+JS_MON_DIR = "{}/test".format(JS_MON_DATA)
+JS_MON_DATA += "/test"
+
 if NOTIFY_SLACK:
     from slack import WebClient
     from slack.errors import SlackApiError
@@ -64,7 +71,10 @@ def get_target_data(endpointdir):
 def get_endpoint(endpoint):
     # get an endpoint, return its content
     try:
-        r = requests.get(endpoint)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'
+        }
+        r = requests.get(endpoint, headers=headers)
         return r.text
     except:
         print("Error while establishing connection")
@@ -79,24 +89,24 @@ def get_hash(string):
 def save_endpoint(endpoint, ephash, eptext):
     # save endpoint content to file
     # add it to  list of
-    with open("{}/hashes.json".format(os.environ['jsMonDir']), "r") as jsm:
+    with open("{}/hashes.json".format(JS_MON_DIR), "r") as jsm:
         jsmd = json.load(jsm)
         if endpoint in jsmd.keys():
             jsmd[endpoint].append(ephash)
         else:
             jsmd[endpoint] = [ephash]
 
-    with open("{}/hashes.json".format(os.environ['jsMonDir']), "w") as jsm:
+    with open("{}/hashes.json".format(JS_MON_DIR), "w") as jsm:
         json.dump(jsmd, jsm)
 
-    with open("{}/downloads/{}".format(os.environ['jsMonDir'], ephash), "w") as epw:
+    with open("{}/downloads/{}".format(JS_MON_DATA, ephash), "w") as epw:
         epw.write(eptext)
 
 
 def get_previous_endpoint_hash(endpoint):
     # get previous endpoint version
     # or None if doesnt exist
-    with open("{}/hashes.json".format(os.environ['jsMonDir']), "r") as jsm:
+    with open("{}/hashes.json".format(JS_MON_DIR), "r") as jsm:
         jsmd = json.load(jsm)
         if endpoint in jsmd.keys():
             return jsmd[endpoint][-1]
@@ -105,16 +115,18 @@ def get_previous_endpoint_hash(endpoint):
 
 
 def get_file_stats(fhash):
-    return os.stat("{}/downloads/{}".format(os.environ['jsMonDir'], fhash))
+    return os.stat("{}/downloads/{}".format(JS_MON_DATA, fhash))
 
 
-def get_diff(old, new):
+def get_diff(endpoint, old, new):
     opt = {
         "indent_with_tabs": 1,
         "keep_function_indentation": 0,
     }
-    oldlines = open("{}/downloads/{}".format(os.environ['jsMonDir'], old), "r").readlines()
-    newlines = open("{}/downloads/{}".format(os.environ['jsMonDir'], new), "r").readlines()
+    oldlines = open("{}/downloads/{}".format(JS_MON_DATA, old),
+                    "r").readlines()
+    newlines = open("{}/downloads/{}".format(JS_MON_DATA, new),
+                    "r").readlines()
     oldbeautified = jsbeautifier.beautify("".join(oldlines), opt).splitlines()
     newbeautified = jsbeautifier.beautify("".join(newlines), opt).splitlines()
     # print(oldbeautified)
@@ -122,11 +134,15 @@ def get_diff(old, new):
 
     differ = difflib.HtmlDiff()
     html = differ.make_file(oldbeautified, newbeautified)
-    # open("test.html", "w").write(html)
-    return html
+    lios = endpoint.rfind('/') + 1
+    end = len(endpoint)
+    fileName = endpoint[lios:end]
+    formattedFileName = "{}.{}.html".format(new, fileName)
+    open("{}/diff/{}".format(JS_MON_DATA, formattedFileName), "w").write(html)
+    return formattedFileName
 
 
-def notify_telegram(endpoint, chatId, prev, new, diff, prevsize, newsize):
+def notify_telegram(endpoint, chatId, prev, new, prevsize, newsize):
     print("[!!!] Endpoint [ {} ] has changed from {} to {}".format(
         endpoint, prev, new))
     log_entry = "{} has been updated from <code>{}</code>(<b>{}</b>Bytes) to <code>{}</code>(<b>{}</b>Bytes)".format(
@@ -136,29 +152,23 @@ def notify_telegram(endpoint, chatId, prev, new, diff, prevsize, newsize):
         'caption': log_entry,
         'parse_mode': 'HTML'
     }
-    fpayload = {
-        'document': ('diff.html', diff)
-    }
+    # fpayload = {
+    #    'document': ('diff.html', diff)
+    # }
 
+    # sendfile = requests.post("https://api.telegram.org/bot{token}/sendDocument".format(token=TELEGRAM_TOKEN),
+    #                        files=fpayload, data=payload)
     sendfile = requests.post("https://api.telegram.org/bot{token}/sendDocument".format(token=TELEGRAM_TOKEN),
-                             files=fpayload, data=payload)
+                             data=payload)
     # print(sendfile.content)
     return sendfile
-    # test2 = requests.post("https://api.telegram.org/bot{token}/sendMessage".format(token=TELEGRAM_TOKEN),
-    #                         data=payload).content
 
 
-def notify_slack(endpoint, slackChannelId, prev, new, diff, prevsize, newsize):
+def notify_slack(endpoint, slackChannelId, prevsize, newsize, diffFileName):
     try:
-        response = client.files_upload(
-            initial_comment="[JSmon] {} has been updated! Download below diff HTML file to check changes.".format(
-                endpoint),
-            channels=slackChannelId,
-            content=diff,
-            channel=slackChannelId,
-            filetype="html",
-            filename="diff.html",
-            title="Diff changes"
+        response = client.chat_postMessage(
+            text="[JSmon] {} has been updated from {} Bytes to {} Bytes. Diff file name: {}".format(endpoint, prevsize, newsize, diffFileName),
+            channel=slackChannelId
         )
         return response
     except SlackApiError as e:
@@ -169,16 +179,16 @@ def notify_slack(endpoint, slackChannelId, prev, new, diff, prevsize, newsize):
 
 
 def notify(endpoint, slackChannelId, telegramChatId, prev, new):
-    diff = get_diff(prev, new)
+    filename = get_diff(endpoint, prev, new)
+
     prevsize = get_file_stats(prev).st_size
     newsize = get_file_stats(new).st_size
     if NOTIFY_TELEGRAM:
         notify_telegram(endpoint, telegramChatId, prev,
-                        new, diff, prevsize, newsize)
+                        new, prevsize, newsize)
 
     if NOTIFY_SLACK:
-        notify_slack(endpoint, slackChannelId, prev,
-                     new, diff, prevsize, newsize)
+        notify_slack(endpoint, slackChannelId, prevsize, newsize, filename)
 
 
 def main():
@@ -190,7 +200,7 @@ def main():
     if NOTIFY_TELEGRAM and "CHANGEME" in [TELEGRAM_TOKEN]:
         print("Please Set Up your Telegram Token And Chat ID!!!")
 
-    allTargets = get_target_data(os.environ['jsMonDir'] + "/targets")
+    allTargets = get_target_data(JS_MON_DIR + "/targets")
 
     for target in allTargets:
         for fullEndpoint in target['endpoints']:
