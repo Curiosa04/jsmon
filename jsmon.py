@@ -18,8 +18,8 @@ JS_MON_DIR = os.environ['jsMonDir']
 JS_MON_DATA = os.environ['jsMonDataDir']
 
 # uncomment for testing
-JS_MON_DIR = "{}/test".format(JS_MON_DATA)
-JS_MON_DATA += "/test"
+#JS_MON_DIR = "{}/test".format(JS_MON_DATA)
+#JS_MON_DATA += "/test"
 
 if NOTIFY_SLACK:
     from slack import WebClient
@@ -45,11 +45,10 @@ def is_valid_endpoint(endpoint):
 
 def get_target_data(endpointdir):
     data = []
-    filenames = []
-    for (dp, dirnames, files) in os.walk(endpointdir):
-        filenames.extend(files)
-    filenames = list(filter(lambda x: x[0] != ".", filenames))
-    filenames = list(filter(lambda x: x != "example.json", filenames))
+    #filenames = []
+    filenames = [fn for fn in os.listdir(endpointdir)
+        if any(fn.endswith(ext) for ext in ["json"])]
+
     for file in filenames:
         with open("{}/{}".format(endpointdir, file), "r") as f:
             data.append(json.load(f))
